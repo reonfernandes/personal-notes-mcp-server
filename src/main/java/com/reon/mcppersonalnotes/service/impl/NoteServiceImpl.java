@@ -16,12 +16,18 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
+import org.springframework.validation.annotation.Validated;
 
+import java.util.Arrays;
 import java.util.List;
 
 @Service
+@Validated
 @Slf4j
 public class NoteServiceImpl implements NoteService {
+
+    private static final Sort NEWEST_FIRST = Sort.by(Sort.Direction.DESC, "createdAt");
+    private static final int MAX_RECENT = 50;
 
     private final NoteRepository noteRepository;
     private final NoteMapper noteMapper;
@@ -55,7 +61,6 @@ public class NoteServiceImpl implements NoteService {
         return notes.map(noteMapper::responseToUser);
     }
 
-    // Pageable can't be built by an LLM, so the tool takes plain page/size and delegates
     @Tool(name = "getAllNotes", description = "List notes page by page, newest first. Page numbers start at 0")
     public List<NoteResponse> listNotes(
             @ToolParam(description = "Page number, starting at 0") int page,
@@ -73,7 +78,6 @@ public class NoteServiceImpl implements NoteService {
         Note note = noteRepository.findById(id)
                 .orElseThrow(() -> new NoteNotFoundException(id));
 
-        // Only overwrite the fields the caller actually sent
         if (updateNote.title() != null) {
             note.setTitle(updateNote.title());
         }
@@ -95,5 +99,52 @@ public class NoteServiceImpl implements NoteService {
             throw new NoteNotFoundException(id);
         }
         noteRepository.deleteById(id);
+    }
+
+    @Override
+    @Tool(name = "searchNotes", description = "Search notes whose title or content contains the given text (case-insensitive), newest first")
+    public List<NoteResponse> searchNotes(@ToolParam(description = "Text to look for in note titles and content") String query) {
+        log.info("Searching notes for: {}", query);
+        if (query == null || query.isBlank()) {
+            throw new IllegalArgumentException("query must not be blank");
+        }
+        String text = query.trim();
+        return noteRepository.findByTitleContainingIgnoreCaseOrContentContainingIgnoreCase(text, text, NEWEST_FIRST)
+                .stream()
+                .map(noteMapper::responseToUser)
+                .toList();
+    }
+
+    @Override
+    @Tool(name = "getNotesByTag", description = "List notes that have the given tag (exact tag match, case-insensitive), newest first")
+    public List<NoteResponse> getNotesByTag(@ToolParam(description = "Tag to filter by, e.g. 'learning'") String tag) {
+        log.info("Fetching notes with tag: {}", tag);
+        if (tag == null || tag.isBlank()) {
+            throw new IllegalArgumentException("tag must not be blank");
+        }
+        String wanted = tag.trim();
+        return noteRepository.findByTagsContainingIgnoreCase(wanted, NEWEST_FIRST)
+                .stream()
+                .filter(note -> Arrays.stream(note.getTags().split(","))
+                        .anyMatch(t -> t.trim().equalsIgnoreCase(wanted)))
+                .map(noteMapper::responseToUser)
+                .toList();
+    }
+
+    @Override
+    @Tool(name = "getRecentNotes", description = "Get the most recently created notes, newest first")
+    public List<NoteResponse> getRecentNotes(@ToolParam(description = "How many notes to return (1 to 50)") int limit) {
+        log.info("Fetching {} most recent notes", limit);
+        int size = Math.clamp(limit, 1, MAX_RECENT);
+        return noteRepository.findAll(PageRequest.of(0, size, NEWEST_FIRST))
+                .map(noteMapper::responseToUser)
+                .getContent();
+    }
+
+    @Override
+    @Tool(name = "countNotes", description = "Count the total number of notes")
+    public long countNotes() {
+        log.info("Counting notes");
+        return noteRepository.count();
     }
 }

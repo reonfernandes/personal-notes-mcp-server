@@ -23,7 +23,7 @@ spring:
         hibernate:
             ddl-auto: update
 logging:
-    pattern:
-        console:
+    console:
+        enabled: false
     file:
         name: C:/Users/Lenovo/IdeaProjects/mcp-personal-notes/logs/mcp-personal-notes-server.log

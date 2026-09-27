@@ -27,6 +27,10 @@ The server exposes the following tools, defined in `NoteServiceImpl` with `@Tool
 | `getAllNotes` | List notes page by page, newest first                         | `page` (starts at 0), `size`                           |
 | `updateNote`  | Update an existing note; only the fields provided are changed | `id`, `title`, `content`, `tags`                       |
 | `deleteNote`  | Permanently delete a note                                     | `id`                                                   |
+| `searchNotes` | Find notes whose title or content contains the text (case-insensitive), newest first | `query`                          |
+| `getNotesByTag` | List notes with an exact tag match (case-insensitive), newest first | `tag`                                            |
+| `getRecentNotes` | Get the most recently created notes                        | `limit` (1 to 50)                                      |
+| `countNotes`  | Count the total number of notes                               | none                                                   |
 
 Each note is returned in this shape:
 
@@ -47,13 +51,12 @@ Each note is returned in this shape:
 ```
 src/main/java/com/reon/mcppersonalnotes
 ├── config/        McpConfig: registers the note service's methods as MCP tools
-├── controller/    NoteController: REST endpoints (see note below)
 ├── dto/           CreateNote, UpdateNote, NoteResponse records
 ├── entity/        Note JPA entity (table: personal_notes)
-├── exception/     NoteNotFoundException and a global exception handler
+├── exception/     NoteNotFoundException
 ├── mapper/        NoteMapper: entity <-> DTO conversion
 ├── repository/    NoteRepository (Spring Data JPA)
-└── service/       NoteService interface and NoteServiceImpl (holds the @Tool methods)
+└── service/       NoteService (validation constraints) and NoteServiceImpl (the @Tool methods)
 ```
 
 ## Prerequisites
@@ -84,7 +87,7 @@ Notes:
 
 - The `.env` path is resolved relative to the directory the application starts in. When an MCP client launches the server, pass the absolute path instead (see [Connecting to Claude Desktop](#connecting-to-claude-desktop)).
 - `spring.jpa.hibernate.ddl-auto: update` creates the `personal_notes` table on first start, so no manual schema setup is needed.
-- `spring.main.web-application-type: none`, `banner-mode: off` and an empty `logging.pattern.console` are required for stdio mode. The MCP protocol runs over stdout, so nothing else should be written there.
+- `spring.main.web-application-type: none`, `banner-mode: off` and `logging.console.enabled: false` are required for stdio mode. The MCP protocol runs over stdout, so nothing else should be written there.
 - Logs are written to the file set in `logging.file.name`. Use an absolute path, because the MCP client decides the working directory the server starts in.
 
 ## Build
@@ -123,24 +126,6 @@ Open Claude Desktop → **Settings → Developer → Edit Config** and add the s
 Claude Desktop does not start the server from the project directory, so the `-Dspring.config.import` argument gives it the absolute path to your `.env` file. Alternatively, remove that argument and pass `DB_URL`, `DB_USERNAME` and `DB_PASSWORD` in an `"env"` block.
 
 Use absolute paths, with backslashes escaped as `\\` on Windows. Fully quit and reopen Claude Desktop after changing the config. The tools listed above should then be available in chat.
-
-## REST API
-
-`NoteController` defines REST endpoints under `/api/v1/note`:
-
-| Method   | Endpoint            | Description                                           |
-|----------|---------------------|-------------------------------------------------------|
-| `POST`   | `/api/v1/note`      | Create a note                                         |
-| `GET`    | `/api/v1/note/{id}` | Get a note by id                                      |
-| `GET`    | `/api/v1/note`      | List notes (paginated, default size 10, newest first) |
-| `PATCH`  | `/api/v1/note/{id}` | Partially update a note                               |
-| `DELETE` | `/api/v1/note/{id}` | Delete a note                                         |
-
-These endpoints are **not active** with the default configuration, because `web-application-type` is set to `none` for stdio mode. To use them, run the application with a servlet web environment, for example:
-
-```bash
-java -jar target/personal-notes-mcp-server.jar --spring.main.web-application-type=servlet --spring.ai.mcp.server.stdio=false
-```
 
 ## Troubleshooting
 
