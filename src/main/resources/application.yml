@@ -1,0 +1,29 @@
+spring:
+    config:
+        import: optional:file:.env[.properties]
+    application:
+        name: mcp-personal-notes
+    datasource:
+        url: ${DB_URL}
+        username: ${DB_USERNAME}
+        password: ${DB_PASSWORD}
+        driver-class-name: org.postgresql.Driver
+    ai:
+        mcp:
+            server:
+                name: personal-notes-mcp-server
+                enabled: true
+                stdio: true
+                version: 1.0.0
+                type: sync
+    main:
+        web-application-type: none
+        banner-mode: off
+    jpa:
+        hibernate:
+            ddl-auto: update
+logging:
+    pattern:
+        console:
+    file:
+        name: C:/Users/Lenovo/IdeaProjects/mcp-personal-notes/logs/mcp-personal-notes-server.log
